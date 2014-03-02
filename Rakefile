@@ -6,6 +6,17 @@ Rake::TestTask.new do |test|
   test.pattern = 'test/**/test_*.rb'
 end
 
+require "rake/extensiontask"
+
+def gemspec
+  @clean_gemspec ||= eval(File.read(File.expand_path('quvi.gemspec', File.dirname(__FILE__))))
+end
+
+Rake::ExtensionTask.new("quvi_ext", gemspec) do |ext|
+  ext.ext_dir = "ext/quvi_ext"
+  CLEAN.include "#{ext.lib_dir}/*.#{RbConfig::CONFIG['DLEXT']}"
+end
+
 desc 'Start an irb session and load the library.'
 task :console do
   debug_lib = begin
