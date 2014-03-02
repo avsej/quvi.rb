@@ -19,10 +19,10 @@ void Init_quvi_ext()
 
     qv_mQuvi = rb_define_module("Quvi");
     qv_mVersion = rb_define_module_under(qv_mQuvi, "VERSION");
-    rb_define_const(qv_mVersion, "QUVI_VERSION", rb_external_str_new_cstr(quvi_version(QUVI_VERSION)));
-    rb_define_const(qv_mVersion, "QUVI_CONFIGURATION", rb_external_str_new_cstr(quvi_version(QUVI_VERSION_CONFIGURATION)));
-    rb_define_const(qv_mVersion, "QUVI_BUILD_CC_CFLAGS", rb_external_str_new_cstr(quvi_version(QUVI_VERSION_BUILD_CC_CFLAGS)));
-    rb_define_const(qv_mVersion, "QUVI_BUILD_TARGET", rb_external_str_new_cstr(quvi_version(QUVI_VERSION_BUILD_TARGET)));
-    rb_define_const(qv_mVersion, "QUVI_BUILD_TIME", rb_external_str_new_cstr(quvi_version(QUVI_VERSION_BUILD_TIME)));
     init_quvi_media();
+    rb_define_const(qv_mVersion, "QUVI_VERSION", rb_str_freeze(rb_external_str_new_cstr(quvi_version(QUVI_VERSION))));
+    rb_define_const(qv_mVersion, "QUVI_CONFIGURATION", rb_str_freeze(rb_external_str_new_cstr(quvi_version(QUVI_VERSION_CONFIGURATION))));
+    rb_define_const(qv_mVersion, "QUVI_BUILD_CC_CFLAGS", rb_str_freeze(rb_external_str_new_cstr(quvi_version(QUVI_VERSION_BUILD_CC_CFLAGS))));
+    rb_define_const(qv_mVersion, "QUVI_BUILD_TARGET", rb_str_freeze(rb_external_str_new_cstr(quvi_version(QUVI_VERSION_BUILD_TARGET))));
+    rb_define_const(qv_mVersion, "QUVI_BUILD_TIME", rb_str_freeze(rb_external_str_new_cstr(quvi_version(QUVI_VERSION_BUILD_TIME))));
 }
