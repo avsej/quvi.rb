@@ -79,7 +79,7 @@ VALUE qv_handle_init(int argc, VALUE *argv, VALUE self)
     qv_handle_t *handle = DATA_PTR(self);
     handle->q = quvi_new();
     if (quvi_ok(handle->q) == QUVI_FALSE) {
-        qv_raise(handle, "can't create quvi_t handle");
+        qv_raise(handle, "unable create quvi_t handle");
     }
     return self;
 }
@@ -135,7 +135,13 @@ VALUE qv_handle_supports_p(int argc, VALUE *argv, VALUE self)
         }
     }
     rb_thread_call_without_gvl(qv_handle_supports_p_nogvl, &params, RUBY_UBF_IO, 0);
-    return params.res == QUVI_TRUE ? Qtrue : Qfalse;
+    if (params.res == QUVI_TRUE) {
+        return Qtrue;
+    }
+    if (quvi_errcode(params.handle) != QUVI_ERROR_NO_SUPPORT) {
+        qv_raise(params.handle, "unable to check if URL supported");
+    }
+    return Qfalse;
 }
 
 void init_quvi_handle()
