@@ -16,9 +16,10 @@ Rake::ExtensionTask.new("quvi_ext", gemspec) do |ext|
   ext.ext_dir = "ext/quvi_ext"
   CLEAN.include "#{ext.lib_dir}/*.#{RbConfig::CONFIG['DLEXT']}"
 end
+Rake::Task['test'].prerequisites.unshift('compile')
 
 desc 'Start an irb session and load the library.'
-task :console do
+task :console => :compile do
   debug_lib = begin
                 require 'debugger'
                 '-rrubygems -rdebugger'
