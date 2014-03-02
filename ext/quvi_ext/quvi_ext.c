@@ -12,12 +12,16 @@ VALUE qv_mQuvi;
 VALUE qv_cHandle;
 VALUE qv_eError;
 
+VALUE qv_DEFAULT_USER_AGENT;
+
 ID qv_sym_any;
+ID qv_sym_autoproxy;
 ID qv_sym_media;
 ID qv_sym_online;
 ID qv_sym_playlist;
 ID qv_sym_subtitle;
 ID qv_sym_type;
+ID qv_sym_user_agent;
 
 typedef struct qv_handle_st
 {
@@ -77,11 +81,51 @@ VALUE qv_handle_alloc(VALUE klass)
 VALUE qv_handle_init(int argc, VALUE *argv, VALUE self)
 {
     qv_handle_t *handle = DATA_PTR(self);
+    VALUE opts,
+          user_agent = qv_DEFAULT_USER_AGENT,
+          autoproxy = Qfalse;
+
+    rb_scan_args(argc, argv, "01", &opts);
+    if (opts != Qnil) {
+        VALUE arg;
+        Check_Type(opts, T_HASH);
+        arg = rb_hash_lookup2(opts, qv_sym_autoproxy, Qundef);
+        if (arg != Qundef) {
+            autoproxy = arg;
+        }
+        arg = rb_hash_aref(opts, qv_sym_user_agent);
+        if (arg != Qnil) {
+            Check_Type(arg, T_STRING);
+            user_agent = arg;
+        }
+    }
     handle->q = quvi_new();
     if (quvi_ok(handle->q) == QUVI_FALSE) {
         qv_raise(handle, "unable create quvi_t handle");
     }
+    rb_funcall2(self, rb_intern("autoproxy="), 1, &autoproxy);
+    rb_funcall2(self, rb_intern("user_agent="), 1, &user_agent);
     return self;
+}
+
+VALUE qv_handle_autoproxy_set(VALUE self, VALUE val)
+{
+    qv_handle_t *handle = DATA_PTR(self);
+    int new_val = RTEST(val);
+
+    quvi_set(handle->q, QUVI_OPTION_AUTOPROXY, new_val);
+    rb_ivar_set(self, rb_intern("@autoproxy"), new_val ? Qtrue : Qfalse);
+    return new_val;
+}
+
+VALUE qv_handle_user_agent_set(VALUE self, VALUE val)
+{
+    qv_handle_t *handle = DATA_PTR(self);
+
+    Check_Type(val, T_STRING);
+    quvi_set(handle->q, QUVI_OPTION_USER_AGENT, RSTRING_PTR(val));
+    rb_ivar_set(self, rb_intern("@user_agent"), val);
+    return val;
 }
 
 typedef struct qv_supports_params_st
@@ -112,7 +156,7 @@ VALUE qv_handle_supports_p(int argc, VALUE *argv, VALUE self)
     params.res = QUVI_FALSE;
     rb_scan_args(argc, argv, "11", &params.url, &opts);
     Check_Type(params.url, T_STRING);
-    if (!NIL_P(opts)) {
+    if (opts != Qnil) {
         VALUE arg;
         Check_Type(opts, T_HASH);
         arg = rb_hash_lookup2(opts, qv_sym_online, Qundef);
@@ -150,16 +194,22 @@ void init_quvi_handle()
     rb_define_alloc_func(qv_cHandle, qv_handle_alloc);
     rb_define_method(qv_cHandle, "initialize", qv_handle_init, -1);
     rb_define_method(qv_cHandle, "supports?", qv_handle_supports_p, -1);
+    rb_define_method(qv_cHandle, "autoproxy=", qv_handle_autoproxy_set, 1);
+    rb_define_method(qv_cHandle, "user_agent=", qv_handle_user_agent_set, 1);
+
+    qv_DEFAULT_USER_AGENT = rb_const_get(qv_cHandle, rb_intern("DEFAULT_USER_AGENT"));
 }
 
 void init_symbols()
 {
     qv_sym_any = ID2SYM(rb_intern("any"));
+    qv_sym_autoproxy = ID2SYM(rb_intern("autoproxy"));
     qv_sym_media = ID2SYM(rb_intern("media"));
     qv_sym_online = ID2SYM(rb_intern("online"));
     qv_sym_playlist = ID2SYM(rb_intern("playlist"));
     qv_sym_subtitle = ID2SYM(rb_intern("subtitle"));
     qv_sym_type = ID2SYM(rb_intern("type"));
+    qv_sym_user_agent = ID2SYM(rb_intern("user_agent"));
 }
 
 void Init_quvi_ext()
