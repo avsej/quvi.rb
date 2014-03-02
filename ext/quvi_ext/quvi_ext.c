@@ -6,6 +6,7 @@
 #pragma GCC diagnostic pop
 
 #include <ruby.h>
+#include <ruby/thread.h>
 
 VALUE qv_mQuvi;
 VALUE qv_cHandle;
@@ -83,41 +84,58 @@ VALUE qv_handle_init(int argc, VALUE *argv, VALUE self)
     return self;
 }
 
+typedef struct qv_supports_params_st
+{
+    qv_handle_t *handle;
+    VALUE url;
+    QuviSupportsType type;
+    QuviSupportsMode mode;
+    QuviBoolean res;
+} qv_supports_params_t;
+
+static void* qv_handle_supports_p_nogvl(void *data1)
+{
+    qv_supports_params_t *params = data1;
+    params->res = quvi_supports(params->handle->q, RSTRING_PTR(params->url),
+                                params->mode, params->type);
+    return 0;
+}
+
 VALUE qv_handle_supports_p(int argc, VALUE *argv, VALUE self)
 {
-    qv_handle_t *handle = DATA_PTR(self);
-    VALUE url, opts;
-    QuviSupportsType type = QUVI_SUPPORTS_TYPE_ANY;
-    QuviSupportsMode mode = QUVI_SUPPORTS_MODE_OFFLINE;
-    QuviBoolean r;
+    VALUE opts;
+    qv_supports_params_t params;
 
-    rb_scan_args(argc, argv, "11", &url, &opts);
-    Check_Type(url, T_STRING);
+    params.handle  = DATA_PTR(self);
+    params.type = QUVI_SUPPORTS_TYPE_ANY;
+    params.mode = QUVI_SUPPORTS_MODE_OFFLINE;
+    params.res = QUVI_FALSE;
+    rb_scan_args(argc, argv, "11", &params.url, &opts);
+    Check_Type(params.url, T_STRING);
     if (!NIL_P(opts)) {
         VALUE arg;
         Check_Type(opts, T_HASH);
         arg = rb_hash_lookup2(opts, qv_sym_online, Qundef);
         if (arg != Qundef) {
-            mode = RTEST(arg) ? QUVI_SUPPORTS_MODE_ONLINE : QUVI_SUPPORTS_MODE_OFFLINE;
+            params.mode = RTEST(arg) ? QUVI_SUPPORTS_MODE_ONLINE : QUVI_SUPPORTS_MODE_OFFLINE;
         }
         arg = rb_hash_aref(opts, qv_sym_type);
         if (arg != Qnil) {
             if (arg == qv_sym_media) {
-                type = QUVI_SUPPORTS_TYPE_MEDIA;
+                params.type = QUVI_SUPPORTS_TYPE_MEDIA;
             } else if (arg == qv_sym_playlist) {
-                type = QUVI_SUPPORTS_TYPE_PLAYLIST;
+                params.type = QUVI_SUPPORTS_TYPE_PLAYLIST;
             } else if (arg == qv_sym_subtitle) {
-                type = QUVI_SUPPORTS_TYPE_SUBTITLE;
+                params.type = QUVI_SUPPORTS_TYPE_SUBTITLE;
             } else if (arg == qv_sym_any) {
-                type = QUVI_SUPPORTS_TYPE_ANY;
+                params.type = QUVI_SUPPORTS_TYPE_ANY;
             } else {
                 rb_raise(rb_eArgError, "unknown type: %s", StringValuePtr(arg));
             }
         }
     }
-
-    r = quvi_supports(handle->q, RSTRING_PTR(url), mode, type);
-    return r == QUVI_TRUE ? Qtrue : Qfalse;
+    rb_thread_call_without_gvl(qv_handle_supports_p_nogvl, &params, RUBY_UBF_IO, 0);
+    return params.res == QUVI_TRUE ? Qtrue : Qfalse;
 }
 
 void init_quvi_handle()
