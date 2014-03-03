@@ -10,7 +10,7 @@ Gem::Specification.new do |spec|
   spec.email         = ["sergey.avseyev@gmail.com"]
   spec.summary       = %q{The library to parse the media stream properties.}
   spec.description   = %q{This is the wrapper for libquvi library, which allows to extract media info (including URLs) from popular media hostings like youtube.}
-  spec.homepage      = "http://avsej.net/quvi"
+  spec.homepage      = "http://avsej.net/quvi.rb"
   spec.license       = "AGPL"
 
   spec.files         = `git ls-files -z`.split("\x0")
