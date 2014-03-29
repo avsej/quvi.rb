@@ -26,6 +26,20 @@ VALUE qv_sym_export_format;
 VALUE qv_sym_filepath;
 VALUE qv_sym_domains;
 VALUE qv_sym_sha1;
+VALUE qv_sym_title;
+VALUE qv_sym_id;
+VALUE qv_sym_thumbnail_url;
+VALUE qv_sym_start_time_ms;
+VALUE qv_sym_duration_ms;
+VALUE qv_sym_video_height;
+VALUE qv_sym_video_width;
+VALUE qv_sym_video_encoding;
+VALUE qv_sym_video_bitrate_kbit_s;
+VALUE qv_sym_audio_encoding;
+VALUE qv_sym_audio_bitrate_kbit_s;
+VALUE qv_sym_container;
+VALUE qv_sym_url;
+VALUE qv_sym_streams;
 
 typedef struct qv_handle_st
 {
@@ -49,14 +63,14 @@ static void qv_handle_free(void *ptr)
 }
 
 #define qv_raise(handle, message) qv_raise_at(handle, message, __FILE__, __LINE__)
-static void qv_raise_at(qv_handle_t *handle, const char *message, const char *file, int line)
+static void qv_raise_at(qv_handle_t *handle, VALUE message, const char *file, int line)
 {
     VALUE exc, str;
     const char *qv_msg;
     char buf[10];
     int qv_code;
 
-    str = rb_str_buf_new_cstr(message ? message : "");
+    str = rb_str_new_shared(message);
     qv_msg = quvi_errmsg(handle->q);
     qv_code = quvi_errcode(handle->q);
     if (qv_msg) {
@@ -105,7 +119,7 @@ VALUE qv_handle_init(int argc, VALUE *argv, VALUE self)
     }
     handle->q = quvi_new();
     if (quvi_ok(handle->q) == QUVI_FALSE) {
-        qv_raise(handle, "unable create quvi_t handle");
+        qv_raise(handle, rb_str_new_cstr("unable create quvi_t handle"));
     }
     rb_funcall2(self, rb_intern("autoproxy="), 1, &autoproxy);
     rb_funcall2(self, rb_intern("user_agent="), 1, &user_agent);
@@ -178,7 +192,7 @@ VALUE qv_handle_supports_p(int argc, VALUE *argv, VALUE self)
             } else if (arg == qv_sym_any) {
                 params.type = QUVI_SUPPORTS_TYPE_ANY;
             } else {
-                rb_raise(rb_eArgError, "unknown type: %s", StringValuePtr(arg));
+                rb_raise(rb_eArgError, "unknown type: %s", StringValueCStr(arg));
             }
         }
     }
@@ -187,7 +201,7 @@ VALUE qv_handle_supports_p(int argc, VALUE *argv, VALUE self)
         return Qtrue;
     }
     if (quvi_errcode(params.handle->q) != QUVI_ERROR_NO_SUPPORT) {
-        qv_raise(params.handle, "unable to check if URL supported");
+        qv_raise(params.handle, rb_str_new_cstr("unable to check if URL supported"));
     }
     return Qfalse;
 }
@@ -219,10 +233,9 @@ VALUE qv_handle_each_script(VALUE self)
             char *s;
 
 #define set_property(key, id) \
+            s = NULL; \
             quvi_script_get(handle->q, types[i], id, &s); \
-            if (strlen(s) > 0) { \
-                rb_hash_aset(script, key, rb_external_str_new_cstr(s)); \
-            }
+            if (s) { rb_hash_aset(script, key, rb_external_str_new_cstr(s)); }
             set_property(qv_sym_sha1, QUVI_SCRIPT_PROPERTY_SHA1);
             set_property(qv_sym_filepath, QUVI_SCRIPT_PROPERTY_FILEPATH);
             rb_hash_aset(script, qv_sym_type, type_names[i]);
@@ -240,6 +253,53 @@ VALUE qv_handle_each_script(VALUE self)
     return Qnil;
 }
 
+VALUE qv_handle_parse(VALUE self, VALUE url)
+{
+    qv_handle_t *handle = DATA_PTR(self);
+    char *s, *u = StringValueCStr(url);
+    quvi_media_t qm;
+    VALUE media, streams, stream;
+    double d;
+
+    qm = quvi_media_new(handle->q, u);
+    if (quvi_ok(handle->q) == QUVI_FALSE) {
+        qv_raise(handle, rb_sprintf("unable create quvi_media_t handle (url=%s)", u));
+    }
+    media = rb_hash_new();
+#define set_property_str(item, key, id) \
+    s = NULL; \
+    quvi_media_get(qm, id, &s); \
+    if (s) { rb_hash_aset(item, key, rb_external_str_new_cstr(s)); }
+#define set_property_int(item, key, id) \
+    d = -1; \
+    quvi_media_get(qm, id, &d); \
+    if (d > 0) { rb_hash_aset(item, key, INT2NUM((int)d)); }
+    set_property_str(media, qv_sym_id, QUVI_MEDIA_PROPERTY_ID);
+    set_property_str(media, qv_sym_title, QUVI_MEDIA_PROPERTY_TITLE);
+    set_property_str(media, qv_sym_thumbnail_url, QUVI_MEDIA_PROPERTY_THUMBNAIL_URL);
+    set_property_int(media, qv_sym_start_time_ms, QUVI_MEDIA_PROPERTY_START_TIME_MS);
+    set_property_int(media, qv_sym_duration_ms, QUVI_MEDIA_PROPERTY_DURATION_MS);
+    streams = rb_hash_aset(media, qv_sym_streams, rb_ary_new());
+    do {
+        stream = rb_hash_new();
+        set_property_str(stream, qv_sym_id, QUVI_MEDIA_STREAM_PROPERTY_ID);
+        set_property_int(stream, qv_sym_video_height, QUVI_MEDIA_STREAM_PROPERTY_VIDEO_HEIGHT);
+        set_property_int(stream, qv_sym_video_width, QUVI_MEDIA_STREAM_PROPERTY_VIDEO_WIDTH);
+        set_property_str(stream, qv_sym_video_encoding, QUVI_MEDIA_STREAM_PROPERTY_VIDEO_ENCODING);
+        set_property_int(stream, qv_sym_video_bitrate_kbit_s, QUVI_MEDIA_STREAM_PROPERTY_VIDEO_BITRATE_KBIT_S);
+        set_property_str(stream, qv_sym_audio_encoding, QUVI_MEDIA_STREAM_PROPERTY_AUDIO_ENCODING);
+        set_property_int(stream, qv_sym_audio_bitrate_kbit_s, QUVI_MEDIA_STREAM_PROPERTY_AUDIO_BITRATE_KBIT_S);
+        set_property_str(stream, qv_sym_container, QUVI_MEDIA_STREAM_PROPERTY_CONTAINER);
+        set_property_str(stream, qv_sym_url, QUVI_MEDIA_STREAM_PROPERTY_URL);
+        rb_ary_push(streams, stream);
+    } while (quvi_media_stream_next(qm) == QUVI_TRUE);
+
+#undef set_property_str
+#undef set_property_int
+
+    return media;
+}
+
 void init_quvi_handle()
 {
     qv_cHandle = rb_define_class_under(qv_mQuvi, "Handle", rb_cObject);
@@ -249,6 +309,7 @@ void init_quvi_handle()
     rb_define_method(qv_cHandle, "autoproxy=", qv_handle_autoproxy_set, 1);
     rb_define_method(qv_cHandle, "user_agent=", qv_handle_user_agent_set, 1);
     rb_define_method(qv_cHandle, "each_script", qv_handle_each_script, 0);
+    rb_define_method(qv_cHandle, "parse", qv_handle_parse, 1);
 
     qv_DEFAULT_USER_AGENT = rb_const_get(qv_cHandle, rb_intern("DEFAULT_USER_AGENT"));
 }
@@ -267,6 +328,20 @@ void init_symbols()
     qv_sym_filepath = ID2SYM(rb_intern("filepath"));
     qv_sym_domains = ID2SYM(rb_intern("domains"));
     qv_sym_sha1 = ID2SYM(rb_intern("sha1"));
+    qv_sym_title = ID2SYM(rb_intern("title"));
+    qv_sym_id = ID2SYM(rb_intern("id"));
+    qv_sym_thumbnail_url = ID2SYM(rb_intern("thumbnail_url"));
+    qv_sym_start_time_ms = ID2SYM(rb_intern("start_time_ms"));
+    qv_sym_duration_ms = ID2SYM(rb_intern("duration_ms"));
+    qv_sym_video_height = ID2SYM(rb_intern("video_height"));
+    qv_sym_video_width = ID2SYM(rb_intern("video_width"));
+    qv_sym_video_encoding = ID2SYM(rb_intern("video_encoding"));
+    qv_sym_video_bitrate_kbit_s = ID2SYM(rb_intern("video_bitrate_kbit_s"));
+    qv_sym_audio_encoding = ID2SYM(rb_intern("audio_encoding"));
+    qv_sym_audio_bitrate_kbit_s = ID2SYM(rb_intern("audio_bitrate_kbit_s"));
+    qv_sym_container = ID2SYM(rb_intern("container"));
+    qv_sym_url = ID2SYM(rb_intern("url"));
+    qv_sym_streams = ID2SYM(rb_intern("streams"));
 }
 
 void Init_quvi_ext()
