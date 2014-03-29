@@ -268,7 +268,7 @@ static void* qv_media_new_nogvl(void *data1)
     return 0;
 }
 
-VALUE qv_handle_parse(VALUE self, VALUE url)
+VALUE qv_handle_parse_media(VALUE self, VALUE url)
 {
     qv_media_new_params_t params;
     VALUE media, streams, stream;
@@ -327,7 +327,7 @@ void init_quvi_handle()
     rb_define_method(qv_cHandle, "autoproxy=", qv_handle_autoproxy_set, 1);
     rb_define_method(qv_cHandle, "user_agent=", qv_handle_user_agent_set, 1);
     rb_define_method(qv_cHandle, "each_script", qv_handle_each_script, 0);
-    rb_define_method(qv_cHandle, "parse", qv_handle_parse, 1);
+    rb_define_method(qv_cHandle, "parse_media", qv_handle_parse_media, 1);
 
     qv_DEFAULT_USER_AGENT = rb_const_get(qv_cHandle, rb_intern("DEFAULT_USER_AGENT"));
 }
