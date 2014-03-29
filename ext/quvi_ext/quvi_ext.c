@@ -56,10 +56,10 @@ static void qv_raise_at(qv_handle_t *handle, const char *message, const char *fi
     qv_msg = quvi_errmsg(handle->q);
     qv_code = quvi_errcode(handle->q);
     if (qv_msg) {
-        rb_str_buf_cat_ascii(str, ": \"");
+        snprintf(buf, 10, ": (0x%02x) \"", qv_code);
+        rb_str_buf_cat_ascii(str, buf);
         rb_str_buf_cat_ascii(str, qv_msg);
         rb_str_buf_cat_ascii(str, "\" ");
-        snprintf(buf, 10, "\" (%d)", qv_code);
     }
     rb_str_buf_cat_ascii(str, " at ");
     rb_str_buf_cat_ascii(str, file);
@@ -182,7 +182,7 @@ VALUE qv_handle_supports_p(int argc, VALUE *argv, VALUE self)
     if (params.res == QUVI_TRUE) {
         return Qtrue;
     }
-    if (quvi_errcode(params.handle) != QUVI_ERROR_NO_SUPPORT) {
+    if (quvi_errcode(params.handle->q) != QUVI_ERROR_NO_SUPPORT) {
         qv_raise(params.handle, "unable to check if URL supported");
     }
     return Qfalse;
