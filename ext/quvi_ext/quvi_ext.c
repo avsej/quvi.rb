@@ -196,18 +196,18 @@ VALUE qv_handle_each_script(VALUE self)
 {
     qv_handle_t *handle = DATA_PTR(self);
     QuviScriptType types[] = {
-        QUVI_SCRIPT_TYPE_SUBTITLE_EXPORT,
-        QUVI_SCRIPT_TYPE_SUBTITLE,
+        QUVI_SCRIPT_TYPE_SCAN,
         QUVI_SCRIPT_TYPE_PLAYLIST,
         QUVI_SCRIPT_TYPE_MEDIA,
-        QUVI_SCRIPT_TYPE_SCAN
+        QUVI_SCRIPT_TYPE_SUBTITLE,
+        QUVI_SCRIPT_TYPE_SUBTITLE_EXPORT
     };
     VALUE type_names[] = {
-        rb_str_freeze(rb_external_str_new_cstr("subtitle_export")),
-        rb_str_freeze(rb_external_str_new_cstr("subtitle")),
+        rb_str_freeze(rb_external_str_new_cstr("scan")),
         rb_str_freeze(rb_external_str_new_cstr("playlist")),
         rb_str_freeze(rb_external_str_new_cstr("media")),
-        rb_str_freeze(rb_external_str_new_cstr("scan"))
+        rb_str_freeze(rb_external_str_new_cstr("subtitle")),
+        rb_str_freeze(rb_external_str_new_cstr("subtitle_export"))
     };
     size_t i;
 
