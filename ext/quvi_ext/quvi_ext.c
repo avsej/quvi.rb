@@ -14,14 +14,18 @@ VALUE qv_eError;
 
 VALUE qv_DEFAULT_USER_AGENT;
 
-ID qv_sym_any;
-ID qv_sym_autoproxy;
-ID qv_sym_media;
-ID qv_sym_online;
-ID qv_sym_playlist;
-ID qv_sym_subtitle;
-ID qv_sym_type;
-ID qv_sym_user_agent;
+VALUE qv_sym_any;
+VALUE qv_sym_autoproxy;
+VALUE qv_sym_media;
+VALUE qv_sym_online;
+VALUE qv_sym_playlist;
+VALUE qv_sym_subtitle;
+VALUE qv_sym_type;
+VALUE qv_sym_user_agent;
+VALUE qv_sym_export_format;
+VALUE qv_sym_filepath;
+VALUE qv_sym_domains;
+VALUE qv_sym_sha1;
 
 typedef struct qv_handle_st
 {
@@ -188,6 +192,54 @@ VALUE qv_handle_supports_p(int argc, VALUE *argv, VALUE self)
     return Qfalse;
 }
 
+VALUE qv_handle_each_script(VALUE self)
+{
+    qv_handle_t *handle = DATA_PTR(self);
+    QuviScriptType types[] = {
+        QUVI_SCRIPT_TYPE_SUBTITLE_EXPORT,
+        QUVI_SCRIPT_TYPE_SUBTITLE,
+        QUVI_SCRIPT_TYPE_PLAYLIST,
+        QUVI_SCRIPT_TYPE_MEDIA,
+        QUVI_SCRIPT_TYPE_SCAN
+    };
+    VALUE type_names[] = {
+        rb_str_freeze(rb_external_str_new_cstr("subtitle_export")),
+        rb_str_freeze(rb_external_str_new_cstr("subtitle")),
+        rb_str_freeze(rb_external_str_new_cstr("playlist")),
+        rb_str_freeze(rb_external_str_new_cstr("media")),
+        rb_str_freeze(rb_external_str_new_cstr("scan"))
+    };
+    size_t i;
+
+    RETURN_ENUMERATOR(self, 0, NULL);
+
+    for (i = 0; i < sizeof(types) / sizeof(QuviScriptType); ++i) {
+        while (quvi_script_next(handle->q, types[i]) == QUVI_TRUE) {
+            VALUE script = rb_hash_new();
+            char *s;
+
+#define set_property(key, id) \
+            quvi_script_get(handle->q, types[i], id, &s); \
+            if (strlen(s) > 0) { \
+                rb_hash_aset(script, key, rb_external_str_new_cstr(s)); \
+            }
+            set_property(qv_sym_sha1, QUVI_SCRIPT_PROPERTY_SHA1);
+            set_property(qv_sym_filepath, QUVI_SCRIPT_PROPERTY_FILEPATH);
+            rb_hash_aset(script, qv_sym_type, type_names[i]);
+            quvi_script_get(handle->q, types[i], QUVI_SCRIPT_PROPERTY_DOMAINS, &s);
+            if (strlen(s) > 0) {
+                VALUE domains = rb_external_str_new_cstr(s);
+                rb_hash_aset(script, qv_sym_domains, rb_str_split(domains, ","));
+            }
+            set_property(qv_sym_export_format, QUVI_SCRIPT_PROPERTY_EXPORT_FORMAT);
+#undef set_property
+
+            rb_yield(script);
+        }
+    }
+    return Qnil;
+}
+
 void init_quvi_handle()
 {
     qv_cHandle = rb_define_class_under(qv_mQuvi, "Handle", rb_cObject);
@@ -196,6 +248,7 @@ void init_quvi_handle()
     rb_define_method(qv_cHandle, "supports?", qv_handle_supports_p, -1);
     rb_define_method(qv_cHandle, "autoproxy=", qv_handle_autoproxy_set, 1);
     rb_define_method(qv_cHandle, "user_agent=", qv_handle_user_agent_set, 1);
+    rb_define_method(qv_cHandle, "each_script", qv_handle_each_script, 0);
 
     qv_DEFAULT_USER_AGENT = rb_const_get(qv_cHandle, rb_intern("DEFAULT_USER_AGENT"));
 }
@@ -210,6 +263,10 @@ void init_symbols()
     qv_sym_subtitle = ID2SYM(rb_intern("subtitle"));
     qv_sym_type = ID2SYM(rb_intern("type"));
     qv_sym_user_agent = ID2SYM(rb_intern("user_agent"));
+    qv_sym_export_format = ID2SYM(rb_intern("export_format"));
+    qv_sym_filepath = ID2SYM(rb_intern("filepath"));
+    qv_sym_domains = ID2SYM(rb_intern("domains"));
+    qv_sym_sha1 = ID2SYM(rb_intern("sha1"));
 }
 
 void Init_quvi_ext()
