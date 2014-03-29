@@ -253,26 +253,43 @@ VALUE qv_handle_each_script(VALUE self)
     return Qnil;
 }
 
+typedef struct qv_media_new_params_st
+{
+    qv_handle_t *handle;
+    char *url;
+    quvi_media_t res;
+} qv_media_new_params_t;
+
+
+static void* qv_media_new_nogvl(void *data1)
+{
+    qv_media_new_params_t *params = data1;
+    params->res = quvi_media_new(params->handle->q, params->url);
+    return 0;
+}
+
 VALUE qv_handle_parse(VALUE self, VALUE url)
 {
-    qv_handle_t *handle = DATA_PTR(self);
-    char *s, *u = StringValueCStr(url);
-    quvi_media_t qm;
+    qv_media_new_params_t params;
     VALUE media, streams, stream;
     double d;
+    char *s;
 
-    qm = quvi_media_new(handle->q, u);
-    if (quvi_ok(handle->q) == QUVI_FALSE) {
-        qv_raise(handle, rb_sprintf("unable create quvi_media_t handle (url=%s)", u));
+    params.handle = DATA_PTR(self);
+    params.url = StringValueCStr(url);
+
+    rb_thread_call_without_gvl(qv_media_new_nogvl, &params, RUBY_UBF_IO, 0);
+    if (quvi_ok(params.handle->q) == QUVI_FALSE) {
+        qv_raise(params.handle, rb_sprintf("unable create quvi_media_t handle (url=%s)", params.url));
     }
     media = rb_hash_new();
 #define set_property_str(item, key, id) \
     s = NULL; \
-    quvi_media_get(qm, id, &s); \
+    quvi_media_get(params.res, id, &s); \
     if (s) { rb_hash_aset(item, key, rb_external_str_new_cstr(s)); }
 #define set_property_int(item, key, id) \
     d = -1; \
-    quvi_media_get(qm, id, &d); \
+    quvi_media_get(params.res, id, &d); \
     if (d > 0) { rb_hash_aset(item, key, INT2NUM((int)d)); }
     set_property_str(media, qv_sym_id, QUVI_MEDIA_PROPERTY_ID);
     set_property_str(media, qv_sym_title, QUVI_MEDIA_PROPERTY_TITLE);
@@ -292,10 +309,11 @@ VALUE qv_handle_parse(VALUE self, VALUE url)
         set_property_str(stream, qv_sym_container, QUVI_MEDIA_STREAM_PROPERTY_CONTAINER);
         set_property_str(stream, qv_sym_url, QUVI_MEDIA_STREAM_PROPERTY_URL);
         rb_ary_push(streams, stream);
-    } while (quvi_media_stream_next(qm) == QUVI_TRUE);
+    } while (quvi_media_stream_next(params.res) == QUVI_TRUE);
 
 #undef set_property_str
 #undef set_property_int
+    quvi_media_free(params.res);
 
     return media;
 }
