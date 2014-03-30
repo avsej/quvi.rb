@@ -260,7 +260,6 @@ typedef struct qv_media_new_params_st
     quvi_media_t res;
 } qv_media_new_params_t;
 
-
 static void* qv_media_new_nogvl(void *data1)
 {
     qv_media_new_params_t *params = data1;
@@ -318,6 +317,61 @@ VALUE qv_handle_parse_media(VALUE self, VALUE url)
     return media;
 }
 
+typedef struct qv_playlist_new_params_st
+{
+    qv_handle_t *handle;
+    char *url;
+    quvi_playlist_t res;
+} qv_playlist_new_params_t;
+
+static void* qv_playlist_new_nogvl(void *data1)
+{
+    qv_media_new_params_t *params = data1;
+    params->res = quvi_playlist_new(params->handle->q, params->url);
+    return 0;
+}
+
+VALUE qv_handle_parse_playlist(VALUE self, VALUE url)
+{
+    qv_playlist_new_params_t params;
+    VALUE playlist, media, medium;
+    char *s;
+    double d;
+
+    params.handle = DATA_PTR(self);
+    params.url = StringValueCStr(url);
+    rb_thread_call_without_gvl(qv_playlist_new_nogvl, &params, RUBY_UBF_IO, 0);
+    if (quvi_ok(params.handle->q) == QUVI_FALSE) {
+        qv_raise(params.handle, rb_sprintf("unable create quvi_media_t handle (url=%s)", params.url));
+    }
+    playlist = rb_hash_new();
+#define set_property_str(item, key, id) \
+    s = NULL; \
+    quvi_playlist_get(params.res, id, &s); \
+    if (s) { rb_hash_aset(item, key, rb_external_str_new_cstr(s)); }
+#define set_property_int(item, key, id) \
+    d = -1; \
+    quvi_playlist_get(params.res, id, &d); \
+    if (d > 0) { rb_hash_aset(item, key, INT2NUM((int)d)); }
+
+    set_property_str(playlist, qv_sym_id, QUVI_PLAYLIST_PROPERTY_ID);
+    set_property_str(playlist, qv_sym_title, QUVI_PLAYLIST_PROPERTY_TITLE);
+    set_property_str(playlist, qv_sym_thumbnail_url, QUVI_PLAYLIST_PROPERTY_THUMBNAIL_URL);
+    media = rb_hash_aset(playlist, qv_sym_media, rb_ary_new());
+    while (quvi_playlist_media_next(params.res) == QUVI_TRUE) {
+        medium = rb_hash_new();
+        set_property_str(medium, qv_sym_url, QUVI_PLAYLIST_MEDIA_PROPERTY_URL);
+        set_property_str(medium, qv_sym_title, QUVI_PLAYLIST_MEDIA_PROPERTY_TITLE);
+        set_property_int(medium, qv_sym_duration_ms, QUVI_PLAYLIST_MEDIA_PROPERTY_DURATION_MS);
+        rb_ary_push(media, medium);
+    }
+#undef set_property_str
+#undef set_property_int
+
+    quvi_playlist_free(params.res);
+    return playlist;
+}
+
 void init_quvi_handle()
 {
     qv_cHandle = rb_define_class_under(qv_mQuvi, "Handle", rb_cObject);
@@ -328,6 +382,7 @@ void init_quvi_handle()
     rb_define_method(qv_cHandle, "user_agent=", qv_handle_user_agent_set, 1);
     rb_define_method(qv_cHandle, "each_script", qv_handle_each_script, 0);
     rb_define_method(qv_cHandle, "parse_media", qv_handle_parse_media, 1);
+    rb_define_method(qv_cHandle, "parse_playlist", qv_handle_parse_playlist, 1);
 
     qv_DEFAULT_USER_AGENT = rb_const_get(qv_cHandle, rb_intern("DEFAULT_USER_AGENT"));
 }
