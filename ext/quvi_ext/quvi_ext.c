@@ -150,7 +150,7 @@ VALUE qv_handle_user_agent_set(VALUE self, VALUE val)
 typedef struct qv_supports_params_st
 {
     qv_handle_t *handle;
-    VALUE url;
+    char *url;
     QuviSupportsType type;
     QuviSupportsMode mode;
     QuviBoolean res;
@@ -159,22 +159,23 @@ typedef struct qv_supports_params_st
 static void* qv_handle_supports_p_nogvl(void *data1)
 {
     qv_supports_params_t *params = data1;
-    params->res = quvi_supports(params->handle->q, RSTRING_PTR(params->url),
+    params->res = quvi_supports(params->handle->q, params->url,
                                 params->mode, params->type);
     return 0;
 }
 
 VALUE qv_handle_supports_p(int argc, VALUE *argv, VALUE self)
 {
-    VALUE opts;
+    VALUE opts, url;
     qv_supports_params_t params;
+
+    rb_scan_args(argc, argv, "11", &url, &opts);
 
     params.handle  = DATA_PTR(self);
     params.type = QUVI_SUPPORTS_TYPE_ANY;
     params.mode = QUVI_SUPPORTS_MODE_OFFLINE;
     params.res = QUVI_FALSE;
-    rb_scan_args(argc, argv, "11", &params.url, &opts);
-    Check_Type(params.url, T_STRING);
+    params.url = StringValueCStr(url);
     if (opts != Qnil) {
         VALUE arg;
         Check_Type(opts, T_HASH);
@@ -202,7 +203,7 @@ VALUE qv_handle_supports_p(int argc, VALUE *argv, VALUE self)
         return Qtrue;
     }
     if (quvi_errcode(params.handle->q) != QUVI_ERROR_NO_SUPPORT) {
-        qv_raise(params.handle, rb_str_new_cstr("unable to check if URL supported"));
+        qv_raise(params.handle, rb_sprintf("unable to check if URL supported (url=%s)", params.url));
     }
     return Qfalse;
 }
