@@ -40,6 +40,7 @@ VALUE qv_sym_audio_bitrate_kbit_s;
 VALUE qv_sym_container;
 VALUE qv_sym_url;
 VALUE qv_sym_streams;
+VALUE qv_sym_best;
 
 typedef struct qv_handle_st
 {
@@ -272,7 +273,7 @@ VALUE qv_handle_parse_media(VALUE self, VALUE url)
     qv_media_new_params_t params;
     VALUE media, streams, stream;
     double d;
-    char *s;
+    char *s, *best;
 
     params.handle = DATA_PTR(self);
     params.url = StringValueCStr(url);
@@ -296,9 +297,15 @@ VALUE qv_handle_parse_media(VALUE self, VALUE url)
     set_property_int(media, qv_sym_start_time_ms, QUVI_MEDIA_PROPERTY_START_TIME_MS);
     set_property_int(media, qv_sym_duration_ms, QUVI_MEDIA_PROPERTY_DURATION_MS);
     streams = rb_hash_aset(media, qv_sym_streams, rb_ary_new());
-    do {
+    quvi_media_stream_choose_best(params.res);
+    quvi_media_get(params.res, QUVI_MEDIA_STREAM_PROPERTY_ID, &best);
+    quvi_media_stream_reset(params.res);
+    while (quvi_media_stream_next(params.res) == QUVI_TRUE) {
         stream = rb_hash_new();
         set_property_str(stream, qv_sym_id, QUVI_MEDIA_STREAM_PROPERTY_ID);
+        if (strcmp(best, s) == 0) {
+            rb_hash_aset(stream, qv_sym_best, Qtrue);
+        }
         set_property_int(stream, qv_sym_video_height, QUVI_MEDIA_STREAM_PROPERTY_VIDEO_HEIGHT);
         set_property_int(stream, qv_sym_video_width, QUVI_MEDIA_STREAM_PROPERTY_VIDEO_WIDTH);
         set_property_str(stream, qv_sym_video_encoding, QUVI_MEDIA_STREAM_PROPERTY_VIDEO_ENCODING);
@@ -308,7 +315,7 @@ VALUE qv_handle_parse_media(VALUE self, VALUE url)
         set_property_str(stream, qv_sym_container, QUVI_MEDIA_STREAM_PROPERTY_CONTAINER);
         set_property_str(stream, qv_sym_url, QUVI_MEDIA_STREAM_PROPERTY_URL);
         rb_ary_push(streams, stream);
-    } while (quvi_media_stream_next(params.res) == QUVI_TRUE);
+    }
 
 #undef set_property_str
 #undef set_property_int
@@ -415,6 +422,7 @@ void init_symbols()
     qv_sym_container = ID2SYM(rb_intern("container"));
     qv_sym_url = ID2SYM(rb_intern("url"));
     qv_sym_streams = ID2SYM(rb_intern("streams"));
+    qv_sym_best = ID2SYM(rb_intern("best"));
 }
 
 void Init_quvi_ext()
