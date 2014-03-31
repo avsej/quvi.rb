@@ -237,12 +237,12 @@ VALUE qv_handle_each_script(VALUE self)
 #define set_property(key, id) \
             s = NULL; \
             quvi_script_get(handle->q, types[i], id, &s); \
-            if (s) { rb_hash_aset(script, key, rb_external_str_new_cstr(s)); }
+            if (s && s[0] != '\0') { rb_hash_aset(script, key, rb_external_str_new_cstr(s)); }
             set_property(qv_sym_sha1, QUVI_SCRIPT_PROPERTY_SHA1);
             set_property(qv_sym_filepath, QUVI_SCRIPT_PROPERTY_FILEPATH);
             rb_hash_aset(script, qv_sym_type, type_names[i]);
             quvi_script_get(handle->q, types[i], QUVI_SCRIPT_PROPERTY_DOMAINS, &s);
-            if (strlen(s) > 0) {
+            if (s && s[0] != '\0') {
                 VALUE domains = rb_external_str_new_cstr(s);
                 rb_hash_aset(script, qv_sym_domains, rb_str_split(domains, ","));
             }
