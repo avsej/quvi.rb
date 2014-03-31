@@ -2,7 +2,7 @@ module Quvi
   module VERSION
     MAJOR = 0
     MINOR = 1
-    PATCH = 0
+    PATCH = 1
     FULL = [MAJOR, MINOR, PATCH].join(".").freeze
 
     def self.to_str
